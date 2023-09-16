@@ -31,8 +31,9 @@ clean:
 
 tar:
 	tar -cf ${USER}.tar bf16.c
-	@echo "============================================================================="
-	@echo "${USER}.tar is generated. Please upload ${USER}.tar to LearnUs."
-	@echo "You need to pull out ${USER}.tar from this server to your computer using scp."
-	@echo "If you have any difficulty, please contact TA."
+	@echo "================================================================================="
+	@echo "${USER}.tar is generated. This does NOT mean your solution is submitted"
+	@echo "You MUST upload ${USER}.tar to LearnUs."
+	@echo "You may need to use scp to copy ${USER}.tar from this server to your computer"
+	@echo "If you have any difficulty, please contact TA (not your colleague)"
 
