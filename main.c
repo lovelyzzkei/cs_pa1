@@ -3,14 +3,11 @@
 
 void put_bf16(bf16 in)
 {
-    char buffer[17] = {0};
-    char *p = &buffer[0];
-    unsigned short val = (unsigned short)in;
-    while (val) {
-        *p++ = (val & 0x8000U) ? '1' : '0';
-        val <<= 1;
+    int i;
+    for ( i=0; i < 16; ++i ) {
+        putchar((in & 0x8000U) ? '1' : '0');
+        in <<= 1;
     }
-    printf("%s", buffer);
 }
 
 int main(void)
