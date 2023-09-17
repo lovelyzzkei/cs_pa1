@@ -2,7 +2,7 @@
 #include "bf16.h"
 
 /*
-    do NOT include any C libraries or header files
+    Do NOT include any C libraries or header files
     except those above
     
     use the defines in bf16.h
