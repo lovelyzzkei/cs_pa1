@@ -10,7 +10,7 @@
 */
 
 bf16 int2bf16 (int input) {
-    bf16 result;
+    bf16 result = 0;
     /*
     fill this function
     */
@@ -18,7 +18,7 @@ bf16 int2bf16 (int input) {
 }
 
 int bf162int (bf16 input) {
-    int result;
+    int result = 0;
     /*
     fill this function
     */
@@ -26,7 +26,7 @@ int bf162int (bf16 input) {
 }
 
 bf16 float2bf16 (float input) {
-    bf16 result;
+    bf16 result = 0;
     /*
     fill this function
     */
@@ -34,7 +34,7 @@ bf16 float2bf16 (float input) {
 }
 
 float bf162float (bf16 input) {
-    float result;
+    float result = 0.0;
     /*
     fill this function
     */
@@ -42,7 +42,7 @@ float bf162float (bf16 input) {
 }
 
 bf16 bf16_add(bf16 in1, bf16 in2) {
-    bf16 result;
+    bf16 result = 0;
     /*
     fill this function
     */
@@ -50,7 +50,7 @@ bf16 bf16_add(bf16 in1, bf16 in2) {
 }
 
 bf16 bf16_mul(bf16 in1, bf16 in2) {
-    bf16 result;
+    bf16 result = 0;
     /*
     fill this function
     */
