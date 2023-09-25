@@ -146,7 +146,7 @@ int bf162int (bf16 input) {
 
 
     // sign & exponent
-    int s = bf16Num[0];
+    int sign = bf16Num[0];
     int exp = 0;
     int bias = 127;
     for (int i = 8; i >= 1; i--) {
@@ -185,18 +185,80 @@ int bf162int (bf16 input) {
     // need to check possible convert number or not
     for (int i = 0; i < e; i++) {
         result += bf16Num[8+e-i] * power(2, i);
-        printf("result: %d\n", result);
     }
     result += power(2, e);
-    
+    result = sign ? -result : result;
+
     return result;
 }
 
+
+#include <stdio.h>
+
+// Define a union to manipulate the bits of a float
+typedef union {
+    float f;
+    unsigned i;
+} Float32;
+
+
 bf16 float2bf16 (float input) {
     bf16 result = 0;
-    /*
-    fill this function
-    */
+
+    Float32 num;
+    num.f = input;
+
+    int bf16Num[16];
+    int binaryNum[32]; // 32-bit binary representation
+    fillArray(bf16Num, 0, 16);
+    fillArray(binaryNum, 0, 32);
+
+    
+
+    printf("float union ");
+    for (int j = 0; j < 32; j++) {
+        binaryNum[j] = (num.i & 0x80000000) ? 1 : 0;
+        num.i <<= 1;
+    }
+    printf("\n");
+
+    // sign & exponent
+    for (int i = 0; i < 16; i++) {
+        bf16Num[i] = binaryNum[i];
+    }
+
+
+    // mantissa (round-even)
+    int sticky = 0;
+    int round = 0;
+    int guard = 0;
+
+    for (int i = 16; i < 32; i++) {
+        sticky |= binaryNum[i];
+    }
+    round = binaryNum[16];
+    guard = binaryNum[15];
+
+    if ((round && sticky) || (guard && round && !sticky)) {
+        int carry = 1;
+        for (int j = 15; j >= 0; j--) {
+            int sum = bf16Num[j] + carry;
+            bf16Num[j] = sum % 2;
+            carry = sum / 2;
+        }
+
+        // if (carry)
+        //     bf16Num[9] = 1;
+    }
+
+    for (int i = 0; i < 16; i++) {
+        printf("%d", bf16Num[i]);
+        result += bf16Num[15-i] * power(2, i);
+
+    }
+    printf("\n");
+
+
     return result;
 }
 
