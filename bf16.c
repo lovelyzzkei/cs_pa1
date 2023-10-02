@@ -9,6 +9,26 @@
     if neccessary, you can add some macros below
 */
 
+#define TMAX 2147483647
+#define TMIN -2147483648
+#define NAN 0x7F81       // 0111 1111 1000 0001 
+
+#define BF16_TMAX 65536 
+#define BF16_TMIN 0
+#define BF16_POS_INF 0x7F80 // 0111 1111 1000 0000
+#define BF16_NEG_INF 0xFF80 // 1111 1111 1000 0000
+
+
+
+// Define a union to manipulate the bits of a float
+typedef union {
+    float f;
+    int ii;
+    unsigned i;
+} Float32;
+
+int nan_flag = 0;
+
 int power(int base, int exp) {
     int result = 1;
     for (int i = 0; i < exp; i++) {
@@ -69,7 +89,6 @@ bf16 int2bf16 (int input) {
     if ((round &&  sticky) || (guard && round && !sticky)) {
         roundEven = !roundEven;
     }
-    printf("round %d guard %d sticky %d\n", round, guard, sticky);
 
     // fill mantissa part
     for (int j = 1; j <= 7; j++) {
@@ -97,25 +116,6 @@ bf16 int2bf16 (int input) {
         exp_idx--;
     }
 
-
-    for (int k = 0; k < 32; k++) {
-        printf("%d", binaryNum[k]);
-    }
-    printf("\n");
-    for (int k = 0; k < 16; k++) {
-        printf("%d", bf16Num[k]);
-    }
-    printf("\n");
-
-
-    printf("length of binary representation: %d\n", len);
-
-    printf("Binary representation: 0b");
-    for (int j = len - 1; j >= 0; j--) {
-        printf("%d", binaryNum[j]);
-    }
-    printf("\n");
-
     int two = 1;
     for (int k = 0; k <= 15; k++) {
         result += bf16Num[15-k] * two;
@@ -124,6 +124,8 @@ bf16 int2bf16 (int input) {
 
     return result;
 }
+
+
 
 int bf162int (bf16 input) {
     int result = 0;
@@ -138,12 +140,16 @@ int bf162int (bf16 input) {
         input <<= 1;
     }
 
-    for (int i = 0; i < 16; i++) {
-        if (i % 4 == 0) printf(" ");
-        printf("%d", bf16Num[i]);
+    // check exp = 000...0
+    int zeroCheck = 0;
+    for (int i = 1; i <= 8; i++) {
+        zeroCheck |= bf16Num[i];
     }
-    printf("\n");
 
+    if (!zeroCheck) {
+        result = 0;
+        return result;
+    }
 
     // sign & exponent
     int sign = bf16Num[0];
@@ -153,16 +159,15 @@ int bf162int (bf16 input) {
         exp += bf16Num[i] * power(2, 8-i);
     }
     int e = exp - bias;
-    printf("exponent: %d\n", e);
 
     // mantissa
     int sticky = 0;
     int guard = 0;
     int round = 0;
+    int carry = 0;
 
     // check round even
     if (e < 7) {
-        printf("roundeven\n");
         for (int i = e; i < 7; i++) {
             sticky |= bf16Num[9+i];
         }
@@ -170,7 +175,7 @@ int bf162int (bf16 input) {
         guard = bf16Num[8+e];
 
         if ((round && sticky) || (guard && round && !sticky)) {
-            int carry = 1;
+            carry = 1;
             for (int j = 8+e; j > 8; j--) {
                 int sum = bf16Num[j] + carry;
                 bf16Num[j] = sum % 2;
@@ -183,23 +188,31 @@ int bf162int (bf16 input) {
     }
 
     // need to check possible convert number or not
-    for (int i = 0; i < e; i++) {
-        result += bf16Num[8+e-i] * power(2, i);
+    int specialCase = 1;
+    for (int i = 1; i <= 8; i++) {
+        specialCase &= bf16Num[i];
     }
-    result += power(2, e);
-    result = sign ? -result : result;
+
+    if (specialCase) {
+        if (carry) { // exp=111...1, frac=000...0 -> Infinity
+            result = (sign) ? TMIN : TMAX;
+        }
+        else { // exp=111...1, frac!=000...0 -> NaN
+            result = TMIN;
+            nan_flag = 1;
+        }
+    }
+    else {
+        for (int i = 0; i < e; i++) {
+            result += bf16Num[8+e-i] * power(2, i);
+        }
+        result += power(2, e);
+        result = sign ? -result : result;
+    }
 
     return result;
 }
 
-
-#include <stdio.h>
-
-// Define a union to manipulate the bits of a float
-typedef union {
-    float f;
-    unsigned i;
-} Float32;
 
 
 bf16 float2bf16 (float input) {
@@ -215,16 +228,25 @@ bf16 float2bf16 (float input) {
 
     
 
-    printf("float union ");
     for (int j = 0; j < 32; j++) {
         binaryNum[j] = (num.i & 0x80000000) ? 1 : 0;
         num.i <<= 1;
     }
-    printf("\n");
 
     // sign & exponent
     for (int i = 0; i < 16; i++) {
         bf16Num[i] = binaryNum[i];
+    }
+
+    // overflow check
+    int overflowCheck = 1;
+    for (int i = 1; i <= 7; i++) {
+        overflowCheck &= bf16Num[i];
+    }
+
+    if (overflowCheck) {
+        result = (bf16Num[0]) ? BF16_TMIN : BF16_TMAX;
+        return result;
     }
 
 
@@ -233,7 +255,7 @@ bf16 float2bf16 (float input) {
     int round = 0;
     int guard = 0;
 
-    for (int i = 16; i < 32; i++) {
+    for (int i = 17; i < 32; i++) {
         sticky |= binaryNum[i];
     }
     round = binaryNum[16];
@@ -251,38 +273,80 @@ bf16 float2bf16 (float input) {
         //     bf16Num[9] = 1;
     }
 
-    for (int i = 0; i < 16; i++) {
-        printf("%d", bf16Num[i]);
-        result += bf16Num[15-i] * power(2, i);
-
-    }
-    printf("\n");
-
-
     return result;
 }
 
 float bf162float (bf16 input) {
     float result = 0.0;
-    /*
-    fill this function
-    */
+
+    Float32 num;
+    num.i = input;
+
+    // 16 additional bits after fraction part
+    for (int i = 0; i < 16; i++) {
+        num.i <<= 1;
+    }
+
+    result = num.f;
     return result;
 }
 
 bf16 bf16_add(bf16 in1, bf16 in2) {
     bf16 result = 0;
-    /*
-    fill this function
-    */
+
+    nan_flag = 0;
+    
+    int b1 = bf162int(in1);
+    int b2 = bf162int(in2);
+
+    if (b1 == TMAX) {
+        if (b2 == TMIN) result = NAN;
+        else result = BF16_POS_INF;
+    }
+    else if (b1 == TMIN) {
+        result = BF16_NEG_INF;
+    }
+    else if (nan_flag) {
+        result = NAN;
+    }
+    else {
+        int sum = b1 + b2;
+        result = int2bf16(sum);
+    }
+
     return result;
 }
 
 bf16 bf16_mul(bf16 in1, bf16 in2) {
     bf16 result = 0;
-    /*
-    fill this function
-    */
-    return result;
 
+    nan_flag = 0;
+
+    int b1 = bf162int(in1);
+    int b2 = bf162int(in2);
+
+    if (b1 == TMAX) {
+        if (b2 == 0) result = NAN;
+        else if (b2 == TMAX || b2 > 0) 
+            result = BF16_POS_INF;
+        else
+            result = BF16_NEG_INF;
+    }
+    else if (b1 == TMIN) {
+        if (b2 == 0)
+            result = NAN;
+        else if (b2 == TMIN || b2 < 0)
+            result = BF16_POS_INF;
+        else
+            result = BF16_NEG_INF;
+    }
+    else if (nan_flag) {
+        result = NAN;
+    }
+    else {
+        int mul = b1 * b2;
+        result = int2bf16(mul);
+    }
+
+    return result;
 }
